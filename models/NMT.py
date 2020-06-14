@@ -6,6 +6,7 @@ from tensorflow.keras.layers import Dense, Embedding, Activation, Permute
 from tensorflow.keras.layers import Input, Flatten, Dropout
 from tensorflow.keras.layers import LSTM
 from tensorflow.keras.layers import TimeDistributed, Bidirectional
+
 from .custom_recurrents import AttentionDecoder
 
 
