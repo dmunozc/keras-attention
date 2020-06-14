@@ -5,7 +5,7 @@
 import os
 import argparse
 
-from keras.callbacks import ModelCheckpoint
+from tensorflow.keras.callbacks import ModelCheckpoint
 
 from models.NMT import simpleNMT
 from data.reader import Data, Vocabulary
@@ -60,7 +60,7 @@ def main(args):
     print('Training. Ctrl+C to end early.')
 
     try:
-        model.fit_generator(generator=training.generator(args.batch_size),
+        model.fit(training.generator(args.batch_size),
                             steps_per_epoch=100,
                             validation_data=validation.generator(args.batch_size),
                             validation_steps=100,
