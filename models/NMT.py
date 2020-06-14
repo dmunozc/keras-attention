@@ -1,10 +1,12 @@
 import numpy as np
 import os
-from keras.models import Model
-from keras.layers import Dense, Embedding, Activation, Permute
-from keras.layers import Input, Flatten, Dropout
-from keras.layers.recurrent import LSTM
-from keras.layers.wrappers import TimeDistributed, Bidirectional
+import tensorflow as tf
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, Embedding, Activation, Permute
+from tensorflow.keras.layers import Input, Flatten, Dropout
+from tensorflow.keras.layers import LSTM
+from tensorflow.keras.layers import TimeDistributed, Bidirectional
+
 from .custom_recurrents import AttentionDecoder
 
 

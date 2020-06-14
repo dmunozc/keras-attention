@@ -1,13 +1,15 @@
 import tensorflow as tf
-from keras import backend as K
-from keras import regularizers, constraints, initializers, activations
-from keras.layers.recurrent import Recurrent
-from keras.engine import InputSpec
+from tensorflow import keras
+from tensorflow.keras import backend as K
+from tensorflow.keras import regularizers, constraints, initializers, activations
+from tensorflow.keras.layers import InputSpec, AbstractRNNCell
+from tensorflow.python.ops import state_ops
+
 from .tdd import _time_distributed_dense
 
 tfPrint = lambda d, T: tf.Print(input_=T, data=[T, tf.shape(T)], message=d)
 
-class AttentionDecoder(Recurrent):
+class AttentionDecoder(AbstractRNNCell):
 
     def __init__(self, units, output_dim,
                  activation='tanh',
@@ -24,15 +26,20 @@ class AttentionDecoder(Recurrent):
                  **kwargs):
         """
         Implements an AttentionDecoder that takes in a sequence encoded by an
-        encoder and outputs the decoded states 
+        encoder and outputs the decoded states
         :param units: dimension of the hidden state and the attention matrices
         :param output_dim: the number of labels in the output space
 
         references:
-            Bahdanau, Dzmitry, Kyunghyun Cho, and Yoshua Bengio. 
-            "Neural machine translation by jointly learning to align and translate." 
+            Bahdanau, Dzmitry, Kyunghyun Cho, and Yoshua Bengio.
+            "Neural machine translation by jointly learning to align and translate."
             arXiv preprint arXiv:1409.0473 (2014).
         """
+        self.unroll = False
+        self.go_backwards = False
+        self.dropout = 0
+        self.recurrent_dropout = 0
+        self.return_state = False
         self.units = units
         self.output_dim = output_dim
         self.return_probabilities = return_probabilities
@@ -51,7 +58,7 @@ class AttentionDecoder(Recurrent):
         self.bias_constraint = constraints.get(bias_constraint)
 
         super(AttentionDecoder, self).__init__(**kwargs)
-        self.name = name
+        self._name = name
         self.return_sequences = True  # must return sequences
 
     def build(self, input_shape):
@@ -207,11 +214,73 @@ class AttentionDecoder(Recurrent):
                                              input_dim=self.input_dim,
                                              timesteps=self.timesteps,
                                              output_dim=self.units)
+        inputs = x
+        mask = None
+        training = None
+        initial_state = None
+        if isinstance(inputs, list):
+          initial_state = inputs[1:]
+          inputs = inputs[0]
+        elif initial_state is not None:
+          pass
+        elif self.stateful:
+          initial_state = self.states
+        else:
+          initial_state = self.get_initial_state(inputs)
 
-        return super(AttentionDecoder, self).call(x)
+        if isinstance(mask, list):
+          mask = mask[0]
+
+        if len(initial_state) != len(self.states):
+          raise ValueError('Layer has ' + str(len(self.states)) +
+                           ' states but was passed ' + str(len(initial_state)) +
+                           ' initial states.')
+        input_shape = K.int_shape(inputs)
+        if self.unroll and input_shape[1] is None:
+          raise ValueError('Cannot unroll a RNN if the '
+                           'time dimension is undefined. \n'
+                           '- If using a Sequential model, '
+                           'specify the time dimension by passing '
+                           'an `input_shape` or `batch_input_shape` '
+                           'argument to your first layer. If your '
+                           'first layer is an Embedding, you can '
+                           'also use the `input_length` argument.\n'
+                           '- If using the functional API, specify '
+                           'the time dimension by passing a `shape` '
+                           'or `batch_shape` argument to your Input layer.')
+        constants = []#self.get_constants(inputs, training=None)
+        preprocessed_input = inputs#self.preprocess_input(inputs, training=None)
+        last_output, outputs, states = K.rnn(
+          self.step,
+          preprocessed_input,
+          initial_state,
+          go_backwards=self.go_backwards,
+          mask=mask,
+          constants=constants,
+          unroll=self.unroll)
+        if self.stateful:
+          updates = []
+          for i in range(len(states)):
+            updates.append(state_ops.assign(self.states[i], states[i]))
+          self.add_update(updates, inputs)
+
+        # Properly set learning phase
+        if 0 < self.dropout + self.recurrent_dropout:
+          last_output._uses_learning_phase = True
+          outputs._uses_learning_phase = True
+
+        if not self.return_sequences:
+          outputs = last_output
+
+        if self.return_state:
+          if not isinstance(states, (list, tuple)):
+            states = [states]
+          else:
+            states = list(states)
+          return [outputs] + states
+        return outputs
 
     def get_initial_state(self, inputs):
-        print('inputs shape:', inputs.get_shape())
 
         # apply the matrix on the first time step to get the initial s0.
         s0 = activations.tanh(K.dot(inputs[:, 0], self.W_s))

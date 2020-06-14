@@ -21,7 +21,7 @@ import babel
 from babel.dates import format_date
 
 fake = Faker()
-fake.seed(230517)
+Faker.seed(230517)
 random.seed(230517)
 
 FORMATS = ['short',
@@ -87,7 +87,7 @@ def create_dataset(dataset_name, n_examples, vocabulary=False):
     human_vocab = set()
     machine_vocab = set()
 
-    with open(dataset_name, 'w') as f:
+    with open(dataset_name, 'w', encoding="utf-8") as f:
         for i in range(n_examples):
             h, m, _ = create_date()
             if h is not None:

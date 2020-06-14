@@ -19,7 +19,7 @@ class Vocabulary(object):
             :param vocabulary_file: the path to the vocabulary
         """
         self.vocabulary_file = vocabulary_file
-        with open(vocabulary_file, 'r') as f:
+        with open(vocabulary_file, 'r', encoding="utf-8") as f:
             self.vocabulary = json.load(f)
 
         self.padding = padding
@@ -99,7 +99,7 @@ class Data(object):
         self.inputs = []
         self.targets = []
 
-        with open(self.file_name, 'r') as f:
+        with open(self.file_name, 'r', encoding="utf-8") as f:
             reader = csv.reader(f)
             for row in reader:
                 self.inputs.append(row[0])
